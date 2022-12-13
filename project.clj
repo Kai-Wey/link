@@ -16,7 +16,11 @@
                  [io.netty/netty-common ~netty-version]
                  [io.netty/netty-handler ~netty-version]
                  [io.netty/netty-transport ~netty-version]
-                 [org.clojure/tools.logging "1.1.0"]]
+                 [org.clojure/tools.logging "1.1.0"]
+                 ;; temporary imports
+                 [tupelo "22.05.24"]
+                 [metosin/reitit  "0.5.15"]
+                 [metosin/jsonista  "0.3.3"]]
   :profiles {:dev {:dependencies [[log4j/log4j "1.2.17"]]}
              :example {:source-paths ["examples"]}}
   :scm {:name "git"

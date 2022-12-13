@@ -19,11 +19,19 @@
   [http2headers-iterator]
   (as-header-map (iterator-seq http2headers-iterator)))
 
+(defn ascii-to-string
+  [header-map]
+  (let [check-fn (fn [[k v]]
+                   (if (= (type v) io.netty.util.AsciiString)
+                     {k (.toString v)}
+                     {k v}))]
+    (into {} (map check-fn header-map))))
+
 (defn ring-data-from-header [ch ^Http2HeadersFrame frame]
   (let [server-addr (channel-addr ch)
         http2headers (.headers frame)
         uri (str (.path http2headers))
-        header-map (from-header-iterator (.iterator http2headers))]
+        header-map (ascii-to-string (from-header-iterator (.iterator http2headers)))]
     {:scheme (keyword (str (.scheme http2headers)))
      :protocol "h2c"
      :request-method (-> (.method http2headers) (string/lower-case) (keyword))
@@ -52,14 +60,21 @@
       [(DefaultHttp2HeadersFrame. http2headers true)])))
 
 (defn http2-on-error [ch exc debug]
+  (println "\n=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=")
+  (println (type exc))
+  (println "\n=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=")
+  (println exc)
+  (println "\n=-=-=-=-=-=-=-=-==-=-=-=-=-=-=-=-=-=-=-=")
+  (println (.getStackTrace exc))
   (let [resp-frames (ring-response-to-http2 {:status 500
                                              :body (if debug
                                                      (str (.getStackTrace exc))
-                                                     "Internal Error")}
+                                                     "Internal Error")
+                                             :exc (str (.getStackTrace exc))}
                                             (.alloc ch))]
     ;; TODO: which stream?
-    (doseq [f resp-frames]
-      (send! ch f))))
+    #_(doseq [f resp-frames]
+        (send! ch f))))
 
 (def ^:const http2-data-key "HTTP_DATA")
 
@@ -93,10 +108,12 @@
 
                  (instance? Http2DataFrame msg)
                  (let [body-in (ByteBufInputStream. (.content ^Http2DataFrame msg))
-                       ring-data (channel-attr-get http2-data-key)]
+                       ring-data (channel-attr-get ch http2-data-key)]
                    (when (> (.available ^ByteBufInputStream body-in) 0)
                      (channel-attr-set! ch http2-data-key
-                                        (assoc ring-data :body body-in)))
+                                        (if (get ring-data :body)
+                                          (assoc ring-data :body (str (:body ring-data) (slurp body-in)))
+                                          (assoc ring-data :body (slurp body-in)))))
                    (handle-full-request ch msg ring-fn async? debug?)))
                )
    (on-error [ch exc]

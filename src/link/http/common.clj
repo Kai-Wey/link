@@ -46,4 +46,6 @@
     (let [buffer (.buffer alloc (.available ^InputStream body))
           buffer-out (ByteBufOutputStream. buffer)]
       (copy body buffer-out)
-      buffer)))
+      buffer)
+    
+    :else (println "content-from-ring-body: body type not found: " (type body) body)))
